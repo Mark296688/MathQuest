@@ -1,0 +1,12 @@
+{
+  "name": "mathquest",
+  "private": true,
+  "type": "module",
+  "description": "Mathe-Lernspiel für die 4. Klasse am Fernseher oder Laptop (lokal, offline, ohne Fremdpakete)",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test tests/*.test.js"
+  }
+}

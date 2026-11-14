@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MathQuest</title>
+<link rel="icon" href="assets/ui/icon.png">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
+</head>
+<body data-screen="s-start">
+<textarea id="sink" aria-hidden="true" tabindex="-1"></textarea>
+
+<section id="s-start" class="screen start">
+  <div class="floaters" aria-hidden="true">
+    <i style="--x:61%;--y:9%;--c:#e84b3c;--d:4.6s;--r:-9deg">2</i>
+    <i style="--x:67%;--y:24%;--c:#f5c542;--d:5.4s;--r:7deg">×</i>
+    <i style="--x:61%;--y:40%;--c:#43b649;--d:5s;--r:-6deg">4</i>
+    <i style="--x:90%;--y:3%;--c:#2f8cf0;--d:5.8s;--r:8deg">8</i>
+    <i style="--x:95%;--y:20%;--c:#e84b3c;--d:4.9s;--r:-8deg">+</i>
+    <i style="--x:94%;--y:44%;--c:#b06ce0;--d:5.6s;--r:6deg">÷</i>
+    <i style="--x:69%;--y:52%;--c:#2f8cf0;--d:6.2s;--r:9deg">5</i>
+  </div>
+  <div class="start-main">
+    <h1 class="logo"><img src="assets/ui/logo.png" alt="MathQuest"></h1>
+    <div class="ribbon">Wer spielt?</div>
+    <div class="players" id="players"></div>
+    <p class="help strip" id="start-help"></p>
+    <p class="warnbox" id="srv-warn" hidden>Der MathQuest-Server läuft nicht. Gespeichert wird nur im Browser. Bitte über die Verknüpfung „MathQuest“ oder MathQuest.cmd starten.</p>
+  </div>
+  <div class="corner-btns">
+    <button class="btn small" id="btn-sound" aria-pressed="true">Ton an</button>
+    <button class="btn small blue" id="btn-eltern">Übersicht für Eltern</button>
+    <button class="btn small" id="btn-setup">Einstellungen</button>
+  </div>
+</section>
+
+<section id="s-intro" class="screen intro" hidden>
+  <div class="card intro-card">
+    <div class="medal"><img class="intro-img" id="intro-img" src="assets/ui/fundament.png" alt=""></div>
+    <div class="ribbon" id="intro-k"></div>
+    <h2 id="intro-t"></h2>
+    <p class="sub" id="intro-s"></p>
+    <p class="help" id="intro-h"></p>
+    <button class="btn primary go" id="btn-go">Los!</button>
+  </div>
+</section>
+
+<section id="s-task" class="screen task" hidden>
+  <header class="hud">
+    <img class="hud-icon" id="hud-icon" src="assets/ui/fundament.png" alt="">
+    <div class="hud-main">
+      <div class="phase" id="phase"></div>
+      <div class="auftrag" id="auftrag"></div>
+    </div>
+    <div class="prog">
+      <div class="dots" id="dots"></div>
+      <button class="btn small red" id="btn-quit">Beenden</button>
+    </div>
+  </header>
+  <div class="stage"><svg id="scene" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMax meet" role="img" aria-label="Aufgabe"></svg></div>
+  <aside class="panel" id="panel" aria-live="polite"></aside>
+</section>
+
+<section id="s-blitz" class="screen blitz" hidden>
+  <header class="hud">
+    <img class="hud-icon" src="assets/ui/turnier.png" alt="">
+    <div class="hud-main">
+      <div class="phase">Turnier</div>
+      <div class="bscore">Richtig: <b id="b-score">0</b> &nbsp; Rekord: <b id="b-best">0</b></div>
+    </div>
+    <button class="btn small red" id="b-quit">Beenden</button>
+  </header>
+  <div class="bbar"><i id="b-bar"></i></div>
+  <div class="bmid">
+    <div class="bmain card">
+      <div class="bq" id="b-q"></div>
+      <div class="bfb" id="b-fb"></div>
+      <p class="bhelp" id="b-help"></p>
+      <button class="btn primary go" id="b-next" hidden>Weiter</button>
+    </div>
+    <!-- Ziffernfeld für den Fall, dass die Spracherkennung nichts liefert (Turnier 25.10.: 4 von 13 Versuchen) -->
+    <div class="bpad card" id="b-pad">
+      <div class="pad-display" id="b-pad-display"></div>
+      <div class="keys" id="b-keys">
+        <button class="btn" data-k="1">1</button><button class="btn" data-k="2">2</button><button class="btn" data-k="3">3</button>
+        <button class="btn" data-k="4">4</button><button class="btn" data-k="5">5</button><button class="btn" data-k="6">6</button>
+        <button class="btn" data-k="7">7</button><button class="btn" data-k="8">8</button><button class="btn" data-k="9">9</button>
+        <button class="btn" data-k="del" aria-label="Löschen">⌫</button><button class="btn" data-k="0">0</button><button class="btn primary" data-k="ok">OK</button>
+      </div>
+    </div>
+  </div>
+  <div></div>
+</section>
+
+<section id="s-album" class="screen album" hidden>
+  <div class="card" id="album-done"></div>
+  <div class="card" id="album-tafel"></div>
+  <div class="endbtns">
+    <button class="btn primary" id="btn-more">Noch eine Runde</button>
+    <button class="btn blue" id="btn-burg">Meine Burg</button>
+    <button class="btn red" id="btn-done">Fertig für heute</button>
+  </div>
+</section>
+
+<section id="s-burg" class="screen burg" hidden>
+  <div class="burg-view" id="burg-view"></div>
+  <header class="burg-head card">
+    <div class="phase" id="burg-k">Bauabnahme</div>
+    <h2 id="burg-t"></h2>
+    <p class="burg-new" id="burg-s"></p>
+  </header>
+  <aside class="burg-side card">
+    <ul class="burg-areas" id="burg-areas"></ul>
+    <div class="burg-info" id="burg-info"></div>
+    <button class="btn primary" id="burg-next">Weiter</button>
+  </aside>
+  <div class="burg-fps" id="burg-fps" hidden></div>
+</section>
+
+<section id="s-eltern" class="screen eltern" hidden>
+  <h2>Übersicht für Eltern</h2>
+  <div class="eltern-cols" id="eltern-cols"></div>
+  <div class="endbtns"><button class="btn" id="btn-eltern-back">Zurück</button></div>
+</section>
+
+<section id="s-setup" class="screen setup" hidden>
+  <div class="card setup-card">
+    <h2>Einstellungen</h2>
+    <p class="setup-welcome" id="setup-welcome" hidden>Willkommen bei MathQuest! Legt hier fest, wer spielt und wie ihr das Spiel bedient. Alles bleibt auf diesem Rechner.</p>
+    <div class="setup-cols">
+      <div class="setup-col">
+        <h3>Wer spielt?</h3>
+        <div class="setup-profiles" id="setup-profiles"></div>
+      </div>
+      <div class="setup-col">
+        <h3>Bedienung</h3>
+        <div id="setup-bedienung"></div>
+      </div>
+    </div>
+    <p class="setup-err" id="setup-err" hidden></p>
+    <div class="endbtns">
+      <button class="btn" id="setup-cancel">Abbrechen</button>
+      <button class="btn primary" id="setup-save">Speichern</button>
+    </div>
+  </div>
+</section>
+
+<div class="confetti" id="confetti" aria-hidden="true"></div>
+
+<div class="overlay" id="keypad" hidden>
+  <div class="pad card">
+    <div class="pad-display" id="pad-display"></div>
+    <div class="keys" id="keys">
+      <button class="btn" data-k="1">1</button><button class="btn" data-k="2">2</button><button class="btn" data-k="3">3</button>
+      <button class="btn" data-k="4">4</button><button class="btn" data-k="5">5</button><button class="btn" data-k="6">6</button>
+      <button class="btn" data-k="7">7</button><button class="btn" data-k="8">8</button><button class="btn" data-k="9">9</button>
+      <button class="btn" data-k="del" aria-label="Löschen">⌫</button><button class="btn" data-k="0">0</button><button class="btn primary" data-k="ok">OK</button>
+    </div>
+    <button class="btn" id="pad-close">Schließen</button>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

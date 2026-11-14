@@ -1,0 +1,7 @@
+# Spielstände, Einstellungen und Protokolle der Kinder: bleiben auf dem Rechner
+data/
+
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

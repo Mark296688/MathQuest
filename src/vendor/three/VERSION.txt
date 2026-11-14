@@ -1,0 +1,1 @@
+three@0.186.1 (npm), MIT. Unverändert kopiert: build/three.module.js, build/three.core.js, examples/jsm/loaders/GLTFLoader.js, examples/jsm/utils/{BufferGeometryUtils,SkeletonUtils}.js
