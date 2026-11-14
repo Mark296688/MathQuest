@@ -1075,7 +1075,7 @@ function renderStart() {
 
 // ---------- Einstellungen ----------
 
-const SET = { draft: null, first: false, del: null };
+const SET = { draft: null, first: false, del: null, pick: null };
 const ZEIGEN_OPT = [
   ['maus', 'Maus oder Touchscreen', 'Klicken wie gewohnt.'],
   ['wii', 'Wii Remote', 'Zeigen und A drücken. Braucht die Couch Workstation, eine DolphinBar und eine Wii Remote (siehe Anleitung).'],
@@ -1089,6 +1089,7 @@ function openSetup(first = false) {
   SET.draft = JSON.parse(JSON.stringify(CFG));
   SET.first = first;
   SET.del = null;
+  SET.pick = null;
   if (first && !SET.draft.profile.length) SET.draft.profile.push({ ...neuesProfil('', SET.draft), id: null });
   $('#setup-welcome').hidden = !first;
   $('#setup-cancel').hidden = first;
@@ -1106,8 +1107,14 @@ function renderSetup() {
       return `<div class="srow sdel" data-i="${i}"><p>Profil <b>${esc(x.name || 'ohne Namen')}</b> löschen? Spielstand und Burg kommen beim Speichern in den Ordner <code>data/papierkorb</code>.</p>`
         + `<button class="btn small red" data-act="del-yes">Ja, löschen</button><button class="btn small" data-act="del-no">Nein</button></div>`;
     }
+    if (SET.pick === i) {
+      return `<div class="srow spick" data-i="${i}"><p>Bild für <b>${esc(x.name || 'das neue Profil')}</b>:</p>`
+        + BILDER.map((b) => `<button class="sbild${x.bild === b.id ? ' on' : ''}" data-act="bild-wahl" data-b="${b.id}" title="${b.name}" aria-label="${b.name}">`
+          + `<img src="assets/ui/${b.id}.png" alt=""></button>`).join('')
+        + '</div>';
+    }
     return `<div class="srow" data-i="${i}">`
-      + `<button class="sbild" data-act="bild" title="Bild wechseln" aria-label="Bild wechseln"><img src="assets/ui/${esc(x.bild)}.png" alt=""></button>`
+      + `<button class="sbild" data-act="bild" title="Bild aussuchen" aria-label="Bild aussuchen"><img src="assets/ui/${esc(x.bild)}.png" alt=""></button>`
       + `<input class="sname" data-act="name" value="${esc(x.name)}" maxlength="${MAX_NAME}" placeholder="Name" aria-label="Name">`
       + `<span class="sfarben">${FARB_IDS.map((f) => `<button class="sfarbe${x.farbe === f ? ' on' : ''}" data-act="farbe" data-f="${f}" style="--c:${CARD_COLORS[f][1]}" aria-label="Burgfarbe ${FARBEN[f].name}" title="Burgfarbe ${FARBEN[f].name}"></button>`).join('')}</span>`
       + `<button class="btn small" data-act="del" aria-label="Profil löschen" title="Profil löschen">✕</button></div>`;
@@ -1131,10 +1138,10 @@ $('#s-setup').addEventListener('click', (e) => {
   const row = b.closest('.srow');
   const i = row ? +row.dataset.i : -1;
   const act = b.dataset.act;
-  if (act === 'bild') {
-    const k = BILDER.findIndex((x) => x.id === d.profile[i].bild);
-    d.profile[i].bild = BILDER[(k + 1) % BILDER.length].id;
-  } else if (act === 'farbe') d.profile[i].farbe = b.dataset.f;
+  if (act !== 'bild') SET.pick = null;
+  if (act === 'bild') SET.pick = SET.pick === i ? null : i;
+  else if (act === 'bild-wahl') d.profile[i].bild = b.dataset.b;
+  else if (act === 'farbe') d.profile[i].farbe = b.dataset.f;
   else if (act === 'del') SET.del = i;
   else if (act === 'del-no') SET.del = null;
   else if (act === 'del-yes') { d.profile.splice(i, 1); SET.del = null; }

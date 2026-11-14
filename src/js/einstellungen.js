@@ -10,6 +10,9 @@ export const BILDER = [
   { id: 'helm', name: 'Ritterhelm' },
   { id: 'drache', name: 'Drache' },
   { id: 'krone', name: 'Krone' },
+  { id: 'einhorn', name: 'Einhorn' },
+  { id: 'eule', name: 'Eule' },
+  { id: 'zauberhut', name: 'Zauberhut' },
 ];
 
 /** Burgfarben, gleiche Schlüssel wie FARBEN in burg.js (Kenney-Paletten). */

@@ -66,6 +66,9 @@ test('neuesProfil: freie id, zuerst unbenutzte Bilder und Farben', () => {
   assert.deepEqual(e.profile.map((x) => x.id), ['anna', 'anna-2']);
   assert.notEqual(e.profile[0].farbe, e.profile[1].farbe);
   assert.notEqual(e.profile[0].bild, e.profile[1].bild);
+  const voll = defaultEinstellungen();
+  for (let i = 0; i < MAX_PROFILE; i++) voll.profile.push(neuesProfil(`Kind ${i}`, voll));
+  assert.equal(new Set(voll.profile.map((x) => x.bild)).size, Math.min(MAX_PROFILE, BILDER.length), 'jedes Profil ein eigenes Bild');
   for (let i = 0; i < MAX_PROFILE - 2; i++) e.profile.push(neuesProfil(`Kind ${i}`, e));
   assert.throws(() => pruefeEinstellungen(e), /zweimal/, 'anna und Anna');
   e.profile[1].name = 'Ben';
