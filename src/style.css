@@ -368,8 +368,10 @@ h2 { font-size: 3.4rem; line-height: 1.1; }
 .eltern .shaky { margin: 0; padding-left: 1.1rem; }
 
 /* Einstellungen */
-.setup { display: flex; align-items: center; justify-content: center; }
-.setup-card { width: 74rem; max-width: 96%; max-height: 100%; overflow: auto; padding: 1.4rem 2rem 1.2rem; gap: .8rem; }
+.setup { display: flex; align-items: center; justify-content: center; padding: .8rem; }
+/* border-box: max-height gilt für die ganze Karte, sonst ragt sie um Rand und Innenabstand über den Bildschirm */
+.setup-card { box-sizing: border-box; width: 78rem; max-width: 100%; max-height: 100%; overflow: auto; padding: 1rem 2rem .9rem; gap: .6rem; }
+.setup-card h2 { font-size: 2.4rem; }
 .setup-welcome { font-size: 1.35rem; margin: 0; line-height: 1.4; }
 .setup-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 2rem; }
 .setup-col { display: flex; flex-direction: column; gap: .7rem; min-width: 0; }
@@ -389,9 +391,9 @@ h2 { font-size: 3.4rem; line-height: 1.1; }
 .sfarbe { width: 2.3rem; height: 2.3rem; border-radius: 50%; border: .16rem solid var(--outline); background: var(--c); cursor: pointer; padding: 0; }
 .sfarbe.on { box-shadow: 0 0 0 .2rem #fff, 0 0 0 .38rem var(--outline); }
 .sadd { align-self: flex-start; }
-.sgroup { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .6rem; }
+.sgroup { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .3rem; }
 .slabel { font-weight: 800; font-size: 1.15rem; color: var(--muted); }
-.sopt { display: flex; flex-direction: column; gap: .15rem; text-align: left; font: inherit; cursor: pointer; padding: .55rem .8rem;
+.sopt { display: flex; flex-direction: column; gap: .15rem; text-align: left; font: inherit; cursor: pointer; padding: .45rem .8rem;
   background: rgba(255, 255, 255, .7); border: .16rem solid var(--line); border-radius: .8rem; color: var(--ink); }
 .sopt b { font-family: var(--display); font-weight: 400; font-size: 1.5rem; }
 .sopt span { font-size: 1.05rem; color: var(--muted); line-height: 1.3; }
