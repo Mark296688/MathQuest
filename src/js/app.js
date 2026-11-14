@@ -1286,6 +1286,14 @@ document.addEventListener('keyup', (e) => {
   if (p.alone && sprache() && now() - p.at >= PTT_MIN_MS) pttTimer = setTimeout(unheard, PTT_WAIT_MS);
 }, true);
 
+// Kein Browser-Zoom: Kommen Wii-Taste + oder − (Ziffernblock + und −), während B noch Strg hält, sieht Chrome
+// Strg+Plus bzw. Strg+Minus und zoomt die Seite. Chrome merkt sich den Zoom für die Adresse, er bleibt also auch nach
+// einem Neustart (am 13.11.2026 dreimal passiert, danach 150 %). Strg+Mausrad und Touchpad-Zoom ebenso sperren.
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (/^[-+=0]$/.test(e.key) || /^Numpad(Add|Subtract|0)$/.test(e.code))) e.preventDefault();
+}, true);
+document.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+
 function unheard() {
   if (current === 's-blitz') {
     if (!B.on || B.busy) return;
