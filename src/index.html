@@ -33,6 +33,14 @@
     <button class="btn small blue" id="btn-eltern">Übersicht für Eltern</button>
     <button class="btn small" id="btn-setup">Einstellungen</button>
   </div>
+  <nav class="legal start-legal"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></nav>
+</section>
+
+<!-- Nur online (online/worker.js): Anmeldung der Eltern. Inhalt aus js/konto.js -->
+<section id="s-konto" class="screen konto" hidden>
+  <img class="konto-logo" src="assets/ui/logo.png" alt="MathQuest">
+  <div class="card konto-card" id="konto-card"></div>
+  <nav class="legal"><a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a></nav>
 </section>
 
 <section id="s-intro" class="screen intro" hidden>
@@ -134,7 +142,7 @@
         <div class="setup-profiles" id="setup-profiles"></div>
       </div>
       <div class="setup-col">
-        <h3>Bedienung</h3>
+        <h3 id="setup-h-rechts">Bedienung</h3>
         <div id="setup-bedienung"></div>
       </div>
     </div>

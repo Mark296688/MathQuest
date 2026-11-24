@@ -468,6 +468,43 @@ h2 { font-size: 3.4rem; line-height: 1.1; }
   to { transform: translate(var(--f), 0) scaleX(-1) translate(calc(-1 * var(--f)), 0); } }
 @keyframes fromRest { from { transform: none; } }
 @keyframes flipV { from { transform: scaleY(1); } to { transform: scaleY(-1); } }
+
+/* ---------- Online-Version: Anmeldung (s-konto), Konto in den Einstellungen, Impressum-Links ----------
+   Die Anmeldung rechnet in px statt rem: rem hängt hier an der Fensterbreite (siehe html), auf einem Handy im
+   Hochformat wäre die Schrift sonst winzig. */
+body[data-screen="s-konto"] { background-image: linear-gradient(rgba(255, 255, 255, .3), rgba(255, 255, 255, .3)), url("assets/ui/hintergrund.jpg"); }
+.konto { display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 12px; overflow-y: auto; padding: 16px; }
+.konto-logo { width: min(80vw, 380px); height: auto; flex: none; }
+.konto-card { box-sizing: border-box; width: min(100%, 560px); flex: none; font-size: clamp(16px, 1.1rem, 20px); padding: 1.1em 1.4em 1.3em; gap: .75em; }
+.konto-card h2 { font-size: 1.9em; margin: 0; }
+.konto-card p { margin: 0; line-height: 1.45; }
+.konto-card form { display: flex; flex-direction: column; gap: .75em; }
+.konto-card .btn { font-size: 1.25em; min-height: 2.5em; padding: .4em 1em; border-radius: .7em; }
+.konto-card .btn.small { font-size: 1em; min-height: 2.2em; align-self: flex-start; }
+.k-intro { color: var(--muted); }
+.k-feld { display: flex; flex-direction: column; gap: .25em; font-weight: 800; }
+.k-feld input, .skform input { font: inherit; font-weight: 600; font-size: 1.1em; padding: .45em .6em; border: 2px solid var(--outline); border-radius: .5em; background: #fff; color: var(--ink); }
+.k-feld input:focus, .skform input:focus, .k-check input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.k-check { display: flex; gap: .6em; align-items: flex-start; line-height: 1.4; }
+.k-check input { width: 1.3em; height: 1.3em; flex: none; margin: .1em 0 0; }
+.k-hinweis { color: var(--ok); font-weight: 800; }
+.k-fehler, .skmsg.bad { color: var(--warn); font-weight: 800; }
+.k-klein { font-size: .9em; color: var(--muted); }
+.k-links { display: flex; flex-wrap: wrap; gap: .3em 1.4em; justify-content: center; }
+.k-link { font: inherit; font-weight: 800; background: none; border: 0; padding: .2em 0; color: #1a5fb4; text-decoration: underline; cursor: pointer; }
+.k-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.legal { font-size: clamp(13px, 1.05rem, 18px); font-weight: 700; color: var(--ink); }
+.legal a { color: inherit; }
+body:not(.online) .legal { display: none; }
+.start-legal { position: absolute; left: 1.6rem; bottom: 1.4rem; background: rgba(255, 253, 246, .85); border-radius: .6rem; padding: .3rem .8rem; }
+.skonto { gap: .6rem; }
+.skonto-mail { font-family: var(--display); font-size: 1.5rem; overflow-wrap: anywhere; }
+.skbtns { display: flex; flex-wrap: wrap; gap: .6rem; }
+.skform { display: flex; flex-direction: column; gap: .5rem; font-size: 1.2rem; }
+.skform label { display: flex; flex-direction: column; gap: .2rem; font-weight: 800; }
+.skform p { margin: 0; line-height: 1.35; }
+.skmsg { margin: 0; font-size: 1.2rem; font-weight: 700; }
+.skmsg.good { color: var(--ok); }
 /* Leerlauf (app.js setzt body.idle nach 45 s ohne Zeigerbewegung): Endlos-Animationen anhalten */
 body.idle .floaters i, body.idle .logo img, body.idle .medal::before, body.idle .intro-img, body.idle .btn.go::after,
 body.idle .album-head img { animation-play-state: paused; }

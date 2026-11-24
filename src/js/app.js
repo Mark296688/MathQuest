@@ -9,7 +9,8 @@ import { makeSteinmetzBlock, logGeo, GEO_PARTS, SHAPE_NAME } from './geo.js';
 import { playZusammen, playFalt } from './steinmetz.js';
 import { makeTorBlock, torSteps, judgeStep, opChoices, torSummary, logTor, partText, TOR_PARTS, PLUS } from './tor.js';
 import { torLayout, sceneTor } from './torszene.js';
-import { loadProfile, saveProfile, logEvent, loadSettings, saveSettings } from './store.js';
+import { loadProfile, saveProfile, logEvent, loadSettings, saveSettings, setKonto, lokaleKopienLoeschen } from './store.js';
+import { kontoStatus, linkAusMail, anmeldung, abmelden, passwortAendern, kontoLoeschen } from './konto.js';
 import { BILDER, FARB_IDS, MAX_PROFILE, MAX_NAME, defaultEinstellungen, neuesProfil, freieId, cleanName } from './einstellungen.js';
 import { sceneAbruf, sceneMauer, sceneTurm, sceneReihe, sceneHof, sceneHofteil, sceneKran, kranFlag, KX0, KX1, kx, KDROP, KHOOK, KWHEEL } from './scenes.js';
 import * as snd from './sound.js';
@@ -19,10 +20,15 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const now = () => performance.now();
 const famLabel = (id) => { const f = famById(id); return `${f.a} · ${f.b}`; };
 
-const SCREENS = ['s-start', 's-intro', 's-task', 's-blitz', 's-album', 's-eltern', 's-burg', 's-setup'];
+const SCREENS = ['s-start', 's-intro', 's-task', 's-blitz', 's-album', 's-eltern', 's-burg', 's-setup', 's-konto'];
+/** Bildschirme mit Eingabefeldern: Dort gehen Tastatur, Einfügen und Fokus normal (nicht ans Spiel). */
+const formScreen = () => current === 's-setup' || current === 's-konto';
 
 // Einstellungen (data/einstellungen.json): Profile und Bedienung
 let CFG = defaultEinstellungen();
+/** Online-Version (online/worker.js): angemeldetes Eltern-Konto { id, email }. Lokal null. */
+let ONLINE = false;
+let KONTO = null;
 /** Zeigen mit der Wii Remote (Couch Workstation: A = Klick, B = Sprache, + / − = Ja / Nein) statt mit der Maus. */
 const wii = () => CFG.bedienung.zeigen === 'wii';
 /** Antworten per Spracherkennung (Handy fügt den Text mit Strg+V ein) statt per Ziffernfeld. */
@@ -1075,7 +1081,7 @@ function renderStart() {
 
 // ---------- Einstellungen ----------
 
-const SET = { draft: null, first: false, del: null, pick: null };
+const SET = { draft: null, first: false, del: null, pick: null, konto: null, kontoMsg: null };
 const ZEIGEN_OPT = [
   ['maus', 'Maus oder Touchscreen', 'Klicken wie gewohnt.'],
   ['wii', 'Wii Remote', 'Zeigen und A drücken. Braucht die Couch Workstation, eine DolphinBar und eine Wii Remote (siehe Anleitung).'],
@@ -1091,7 +1097,13 @@ function openSetup(first = false) {
   SET.del = null;
   SET.pick = null;
   if (first && !SET.draft.profile.length) SET.draft.profile.push({ ...neuesProfil('', SET.draft), id: null });
+  SET.konto = null;
+  SET.kontoMsg = null;
   $('#setup-welcome').hidden = !first;
+  $('#setup-welcome').textContent = ONLINE
+    ? 'Willkommen bei MathQuest! Leg hier für jedes Kind ein Profil an. Ein Vorname oder Spitzname reicht. Fortschritt und Burg werden in deinem Konto gespeichert.'
+    : 'Willkommen bei MathQuest! Legt hier fest, wer spielt und wie ihr das Spiel bedient. Alles bleibt auf diesem Rechner.';
+  $('#setup-h-rechts').textContent = ONLINE ? 'Konto' : 'Bedienung';
   $('#setup-cancel').hidden = first;
   $('#setup-err').hidden = true;
   renderSetup();
@@ -1104,7 +1116,8 @@ function renderSetup() {
   const d = SET.draft;
   $('#setup-profiles').innerHTML = d.profile.map((x, i) => {
     if (SET.del === i) {
-      return `<div class="srow sdel" data-i="${i}"><p>Profil <b>${esc(x.name || 'ohne Namen')}</b> löschen? Spielstand und Burg kommen beim Speichern in den Ordner <code>data/papierkorb</code>.</p>`
+      const wohin = ONLINE ? 'werden beim Speichern endgültig gelöscht' : 'kommen beim Speichern in den Ordner <code>data/papierkorb</code>';
+      return `<div class="srow sdel" data-i="${i}"><p>Profil <b>${esc(x.name || 'ohne Namen')}</b> löschen? Spielstand und Burg ${wohin}.</p>`
         + `<button class="btn small red" data-act="del-yes">Ja, löschen</button><button class="btn small" data-act="del-no">Nein</button></div>`;
     }
     if (SET.pick === i) {
@@ -1120,11 +1133,84 @@ function renderSetup() {
       + `<button class="btn small" data-act="del" aria-label="Profil löschen" title="Profil löschen">✕</button></div>`;
   }).join('')
     + (d.profile.length < MAX_PROFILE ? '<button class="btn small blue sadd" data-act="add">+ Profil hinzufügen</button>' : '');
+  if (ONLINE) { $('#setup-bedienung').innerHTML = kontoHtml(); return; }
   const opts = (key, list) => list.map(([v, t, h]) => `<button class="sopt${d.bedienung[key] === v ? ' on' : ''}" data-act="opt" data-k="${key}" data-v="${v}">`
     + `<b>${t}</b><span>${h}</span></button>`).join('');
   $('#setup-bedienung').innerHTML = `<div class="sgroup"><div class="slabel">Zeigen und klicken</div>${opts('zeigen', ZEIGEN_OPT)}</div>`
     + `<div class="sgroup"><div class="slabel">Antworten</div>${opts('antworten', ANTWORTEN_OPT)}</div>`;
 }
+
+/** Online statt „Bedienung“: Konto (Maus und Tippen sind dort fest eingestellt). SET.konto: null, 'pw' oder 'loeschen'. */
+function kontoHtml() {
+  const msg = SET.kontoMsg ? `<p class="skmsg ${SET.kontoMsg.gut ? 'good' : 'bad'}" role="status">${esc(SET.kontoMsg.text)}</p>` : '';
+  const pw = (name, label, auto) => `<label>${label}<input type="password" name="${name}" autocomplete="${auto}" required></label>`;
+  let inhalt;
+  if (SET.konto === 'pw') {
+    inhalt = '<form class="skform" data-form="pw">'
+      + `<input type="email" name="email" autocomplete="username" value="${esc(KONTO.email)}" hidden readonly>`
+      + pw('alt', 'Bisheriges Passwort', 'current-password') + pw('neu', 'Neues Passwort (mindestens 10 Zeichen)', 'new-password')
+      + `${msg}<div class="skbtns"><button class="btn small primary" type="submit">Passwort ändern</button>`
+      + '<button class="btn small" type="button" data-act="k-zu">Abbrechen</button></div></form>';
+  } else if (SET.konto === 'loeschen') {
+    inhalt = '<form class="skform" data-form="loeschen">'
+      + '<p>Das Konto mit allen Profilen, Spielständen und Burgen wird sofort und endgültig gelöscht.</p>'
+      + `<input type="email" name="email" autocomplete="username" value="${esc(KONTO.email)}" hidden readonly>`
+      + pw('passwort', 'Passwort zur Bestätigung', 'current-password')
+      + `${msg}<div class="skbtns"><button class="btn small red" type="submit">Endgültig löschen</button>`
+      + '<button class="btn small" type="button" data-act="k-zu">Abbrechen</button></div></form>';
+  } else {
+    inhalt = '<div class="skbtns">'
+      + '<button class="btn small" data-act="k-ab">Abmelden</button>'
+      + '<button class="btn small" data-act="k-pw">Passwort ändern</button>'
+      + '<button class="btn small" data-act="k-daten">Meine Daten herunterladen</button>'
+      + `<button class="btn small red" data-act="k-loeschen">Konto löschen</button></div>${msg}`;
+  }
+  return `<div class="sgroup skonto"><div class="slabel">Angemeldet als</div><div class="skonto-mail">${esc(KONTO.email)}</div>${inhalt}`
+    + '<p class="legal"><a href="/impressum" target="_blank" rel="noopener">Impressum</a> · '
+    + '<a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a></p></div>';
+}
+
+$('#setup-bedienung').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!ONLINE || !b || !b.dataset.act || !b.dataset.act.startsWith('k-')) return;
+  const act = b.dataset.act;
+  SET.kontoMsg = null;
+  if (act === 'k-ab') {
+    b.disabled = true;
+    await abmelden();
+    lokaleKopienLoeschen(KONTO.id);
+    location.replace('/');
+    return;
+  }
+  if (act === 'k-daten') { location.href = '/api/konto/daten'; return; }
+  SET.konto = act === 'k-pw' ? 'pw' : act === 'k-loeschen' ? 'loeschen' : null;
+  renderSetup();
+  const ein = $('#setup-bedienung input:not([hidden])');
+  if (ein) ein.focus();
+});
+
+$('#setup-bedienung').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const f = Object.fromEntries(new FormData(form));
+  const knopf = form.querySelector('button[type=submit]');
+  knopf.disabled = true;
+  knopf.textContent = 'Moment …';
+  if (form.dataset.form === 'pw') {
+    const r = await passwortAendern(KONTO.email, f.alt, f.neu);
+    if (r.ok) SET.konto = null;
+    SET.kontoMsg = { gut: r.ok, text: r.ok ? 'Passwort geändert. Andere Geräte sind jetzt abgemeldet.' : r.error };
+  } else if (form.dataset.form === 'loeschen') {
+    const r = await kontoLoeschen(KONTO.email, f.passwort);
+    if (r.ok) {
+      lokaleKopienLoeschen(KONTO.id);
+      location.replace('/?geloescht');
+      return;
+    }
+    SET.kontoMsg = { gut: false, text: r.error };
+  }
+  renderSetup();
+});
 
 $('#s-setup').addEventListener('input', (e) => {
   const row = e.target.closest('.srow');
@@ -1171,7 +1257,7 @@ async function saveSetup() {
 
 $('#setup-save').addEventListener('click', saveSetup);
 $('#setup-cancel').addEventListener('click', () => { SET.draft = null; show('s-start'); });
-$('#s-setup').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); saveSetup(); } });
+$('#s-setup').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('input.sname')) { e.preventDefault(); saveSetup(); } });
 
 // ---------- Ziffernblock ----------
 
@@ -1215,7 +1301,7 @@ $('#b-keys').addEventListener('click', (e) => {
 
 // ---------- Ereignisse ----------
 
-$('#players').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) choosePlayer(b.dataset.id); });
+$('#players').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) choosePlayer(b.dataset.id).catch(nurAbgemeldet); });
 $('#btn-go').addEventListener('click', goPhase);
 $('#btn-quit').addEventListener('click', finishRound);
 $('#b-quit').addEventListener('click', () => { if (B.on) blitzFinish(true); else finishRound(); });
@@ -1224,7 +1310,7 @@ $('#btn-more').addEventListener('click', newRound);
 $('#btn-burg').addEventListener('click', () => showBurg('ansehen'));
 $('#burg-next').addEventListener('click', () => { if (burgMode === 'abnahme') showAlbum(); else show('s-album'); });
 $('#btn-done').addEventListener('click', () => { S.p = null; show('s-start'); });
-$('#btn-eltern').addEventListener('click', showEltern);
+$('#btn-eltern').addEventListener('click', () => showEltern().catch(nurAbgemeldet));
 $('#btn-eltern-back').addEventListener('click', () => show('s-start'));
 $('#btn-setup').addEventListener('click', () => openSetup(false));
 
@@ -1261,7 +1347,7 @@ $('#panel').addEventListener('click', (e) => {
 
 // Spracherkennung: Die Couch Workstation fügt den Text per Strg+V ein.
 document.addEventListener('paste', (e) => {
-  if (current === 's-setup') return; // Namen dürfen eingefügt werden
+  if (formScreen()) return; // Namen, Mailadressen und Passwörter dürfen eingefügt werden
   e.preventDefault();
   clearTimeout(pttTimer);
   onText((e.clipboardData && e.clipboardData.getData('text')) || '', 'sprache');
@@ -1311,7 +1397,7 @@ function unheard() {
 
 // Tastatur: Ziffern tippen, Enter. Bei „Ziffern tippen“ zählt Enter sofort, sonst kommt die Rückfrage wie bei der Sprache.
 document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey || e.altKey || e.metaKey || current === 's-setup') return;
+  if (e.ctrlKey || e.altKey || e.metaKey || formScreen()) return;
   if (current === 's-blitz') { blitzKey(e); return; }
   const waiting = current === 's-task' && S.state === 'wait';
   if (!sprache() && waiting && /^([0-9]|Backspace|Enter)$/.test(e.key)) {
@@ -1340,13 +1426,13 @@ function blitzKey(e) {
   $('#b-pad-display').textContent = B.pad;
 }
 
-// Der Fokus bleibt auf einem unsichtbaren Feld, damit Strg+V immer ankommt. Nicht in den Einstellungen (Namensfelder).
+// Der Fokus bleibt auf einem unsichtbaren Feld, damit Strg+V immer ankommt. Nicht in Einstellungen und Anmeldung (Eingabefelder).
 const sink = $('#sink');
-const refocus = () => { if (current !== 's-setup' && document.activeElement !== sink) sink.focus({ preventScroll: true }); };
+const refocus = () => { if (!formScreen() && document.activeElement !== sink) sink.focus({ preventScroll: true }); };
 document.addEventListener('click', () => setTimeout(refocus, 0));
 window.addEventListener('focus', refocus);
 document.addEventListener('fullscreenchange', refocus);
-document.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('contextmenu', (e) => { if (!e.target.closest('input')) e.preventDefault(); });
 refocus();
 
 // Daueranimationen (schwebende Zahlen, Logo, Strahlen) anhalten, wenn länger niemand den Zeiger bewegt.
@@ -1361,14 +1447,52 @@ const wake = () => {
 ['mousemove', 'mousedown', 'keydown', 'paste'].forEach((t) => document.addEventListener(t, wake, { passive: true }));
 wake();
 
-fetch('/api/health').then((r) => { if (!r.ok) throw new Error(); }).catch(() => { $('#srv-warn').hidden = false; });
+// Start: Lokal oder online? Online erst anmelden. Dann Einstellungen laden, ohne Profile (erster Start) gleich die Einrichtung.
+/** Online kann die Anmeldung unterwegs ablaufen: Dann übernimmt der Handler für „mq-abgemeldet“. */
+const nurAbgemeldet = (e) => { if (e.message !== 'abgemeldet') throw e; };
 
-// Start: Einstellungen laden. Ohne Profile (erster Start) gleich die Einrichtung zeigen.
-loadSettings().then((e) => {
-  CFG = e;
+async function ladeEinstellungen() {
+  try { CFG = await loadSettings(); } catch (e) { nurAbgemeldet(e); return; }
   renderStart();
   if (!CFG.profile.length) openSetup(true);
+  else show('s-start');
+}
+
+async function anmelden(opts = {}) {
+  KONTO = await anmeldung({ zeige: show, ...opts });
+  setKonto(KONTO);
+}
+
+let wiederAnmelden = false;
+window.addEventListener('mq-abgemeldet', async () => {
+  if (!ONLINE || wiederAnmelden || current === 's-konto') return;
+  wiederAnmelden = true;
+  S.p = null;
+  if (B.on) { B.on = false; cancelAnimationFrame(B.raf); }
+  closePad();
+  try {
+    await anmelden({ hinweis: 'Du bist abgemeldet worden. Bitte melde dich wieder an.' });
+    await ladeEinstellungen();
+  } finally { wiederAnmelden = false; }
 });
+
+(async function start() {
+  const st = await kontoStatus();
+  if (!st.erreichbar) {
+    const lokal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+    if (!lokal) $('#srv-warn').textContent = 'Keine Verbindung zum Server. Gespeichert wird vorerst nur in diesem Browser.';
+    $('#srv-warn').hidden = false;
+  }
+  ONLINE = st.online;
+  document.body.classList.toggle('online', ONLINE);
+  if (ONLINE) {
+    const link = linkAusMail();
+    KONTO = st.konto;
+    if (KONTO && !link) setKonto(KONTO);
+    else await anmelden({ link });
+  }
+  await ladeEinstellungen();
+})();
 
 // Nur zum Testen (Adresse mit ?debug): Zugriff auf Ablauf und Burg
 if (DEBUG.has('debug')) window.__mq = { S, showBurg, finishRound, choosePlayer, saveProfile, startPhase, openSetup, cfg: () => CFG };

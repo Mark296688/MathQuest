@@ -1,15 +1,36 @@
 // Spielstand und Einstellungen laden und speichern: über den lokalen Server in data/, mit Kopie im Browser als Rückfall.
+// Online (online/worker.js): dieselben Adressen, aber je Eltern-Konto. Die Kopie im Browser hängt dann am Konto,
+// Lernprotokolle werden nicht geschickt, und eine abgelaufene Anmeldung meldet das Ereignis „mq-abgemeldet“.
 import { newProfile, upgradeProfile } from './motor.js';
 import { pruefeEinstellungen, defaultEinstellungen } from './einstellungen.js';
 
-const LOCAL = (id) => `mathquest-profile-${id}`;
-const LOCAL_SETTINGS = 'mathquest-einstellungen';
+/** Im Online-Modus: { id } des angemeldeten Kontos, sonst null (lokale Version). */
+let KONTO = null;
+export function setKonto(konto) { KONTO = konto ? { id: konto.id } : null; }
+
+const praefix = () => (KONTO ? `mathquest-o-${KONTO.id}-` : 'mathquest-');
+const LOCAL = (id) => `${praefix()}profile-${id}`;
+const LOCAL_SETTINGS = () => `${praefix()}einstellungen`;
 
 function localGet(key) {
   try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
 }
 function localSet(key, v) {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* voll oder gesperrt */ }
+}
+
+/** Beim Abmelden und Löschen: Kopien dieses Kontos aus dem Browser entfernen (geteilte Geräte). */
+export function lokaleKopienLoeschen(kontoId) {
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith(`mathquest-o-${kontoId}-`)) localStorage.removeItem(k);
+  } catch { /* gesperrt */ }
+}
+
+/** Online: Anmeldung abgelaufen (401). Das Spiel zeigt dann die Anmeldung. */
+function abgemeldet(res) {
+  if (!KONTO || res.status !== 401) return false;
+  window.dispatchEvent(new CustomEvent('mq-abgemeldet'));
+  return true;
 }
 
 export let serverOk = true;
@@ -23,20 +44,25 @@ export async function loadSettings() {
   try {
     const res = await fetch('/api/einstellungen', { cache: 'no-store' });
     serverOk = res.ok;
-    if (res.ok) { const e = await res.json(); localSet(LOCAL_SETTINGS, e); return e; }
-  } catch { serverOk = false; }
-  try { return pruefeEinstellungen(localGet(LOCAL_SETTINGS) || defaultEinstellungen()); } catch { return defaultEinstellungen(); }
+    if (abgemeldet(res)) throw new Error('abgemeldet');
+    if (res.ok) { const e = await res.json(); localSet(LOCAL_SETTINGS(), e); return e; }
+  } catch (e) {
+    if (e.message === 'abgemeldet') throw e;
+    serverOk = false;
+  }
+  try { return pruefeEinstellungen(localGet(LOCAL_SETTINGS()) || defaultEinstellungen()); } catch { return defaultEinstellungen(); }
 }
 
 /** Speichert und gibt die geprüften Einstellungen zurück. Wirft bei ungültigen Angaben (Meldung vom Server). */
 export async function saveSettings(e) {
   const checked = pruefeEinstellungen(e);
-  localSet(LOCAL_SETTINGS, checked);
+  localSet(LOCAL_SETTINGS(), checked);
   let res;
   try {
     res = await fetch('/api/einstellungen', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checked) });
   } catch { serverOk = false; return checked; }
   serverOk = true;
+  if (abgemeldet(res)) throw new Error('Bitte melde dich wieder an.');
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || 'Speichern fehlgeschlagen');
   return body;
@@ -57,9 +83,13 @@ async function loadRaw(cfg) {
   try {
     const res = await fetch(`/api/state/${cfg.id}`, { cache: 'no-store' });
     serverOk = true;
+    if (abgemeldet(res)) throw new Error('abgemeldet');
     if (res.ok) return await res.json();
     if (res.status === 404) return localGet(LOCAL(cfg.id)) || newProfile(cfg.name, Date.now());
-  } catch { serverOk = false; }
+  } catch (e) {
+    if (e.message === 'abgemeldet') throw e;
+    serverOk = false;
+  }
   return localGet(LOCAL(cfg.id)) || newProfile(cfg.name, Date.now());
 }
 
@@ -83,6 +113,7 @@ export function saveProfile(p) {
           method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cur),
         });
         serverOk = res.ok;
+        abgemeldet(res);
       } catch { serverOk = false; }
     }
     q.busy = null;
@@ -90,8 +121,9 @@ export function saveProfile(p) {
   return q.busy;
 }
 
-/** Eine Zeile ins Protokoll (data/logs/<id>.jsonl). Fehler werden nur vermerkt. */
+/** Eine Zeile ins Protokoll (data/logs/<id>.jsonl). Fehler werden nur vermerkt. Online: nichts (Datensparsamkeit). */
 export async function logEvent(p, ev) {
+  if (KONTO) return;
   try {
     const res = await fetch(`/api/log/${profileId(p)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ev),

@@ -1,0 +1,11 @@
+/* Impressum und Datenschutz (online/seiten.js): schlicht und gut lesbar, auch auf dem Handy. */
+@font-face { font-family: "Nunito"; src: url("assets/fonts/Nunito.ttf") format("truetype"); font-weight: 200 1000; font-display: swap; }
+:root { color-scheme: light; }
+body { margin: 0; background: #f6efe0; color: #1f2a37; font: 17px/1.6 "Nunito", "Segoe UI", system-ui, sans-serif; }
+main { box-sizing: border-box; max-width: 46rem; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 2rem; line-height: 1.2; margin: .4em 0 .6em; }
+h2 { font-size: 1.3rem; margin: 1.6em 0 .4em; }
+h3 { font-size: 1.1rem; margin: 1.2em 0 .3em; }
+a { color: #1a5fb4; }
+.zurueck { margin: 0; font-weight: 700; }
+ul { padding-left: 1.3em; }
