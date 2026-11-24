@@ -35,7 +35,13 @@ const wii = () => CFG.bedienung.zeigen === 'wii';
 const sprache = () => CFG.bedienung.antworten === 'sprache';
 /** Sprechen: mit der Wii Remote B halten, sonst das Tastenkürzel von Handy. */
 const holdTxt = () => (wii() ? 'B halten' : 'Sprach-Taste halten');
-const clickTxt = () => (wii() ? 'Zielen, dann A drücken' : 'Mit der Maus anklicken');
+/** Hochformat (Handy hochkant): gleiche Grenze wie in style.css. */
+const HOCH = matchMedia('(max-aspect-ratio: 4/5)');
+/** Bedienung mit dem Finger (Handy, Tablet): Texte sagen „tippen“ statt „klicken“. Die Wii Remote geht vor. */
+const finger = () => !wii() && matchMedia('(pointer: coarse)').matches;
+const clickTxt = () => (wii() ? 'Zielen, dann A drücken' : finger() ? 'Mit dem Finger antippen' : 'Mit der Maus anklicken');
+/** „Klick“ oder „Tipp“ am Satzanfang: „Klick auf die Stelle.“ */
+const klick = () => (finger() ? 'Tipp' : 'Klick');
 let current = 's-start';
 // Enter drückt den grünen Hauptknopf (siehe enterKnopf), aber erst kurz nachdem er erschienen ist:
 // Wer Enter doppelt drückt oder hält, soll nicht an „Richtig!“ und am Rechenweg vorbeirauschen.
@@ -159,7 +165,7 @@ function showIntro() {
       `Rechne aus, wie viele Steine du brauchst. Beim Kran zielst du auf den Zahlenstrahl bis ${fmt(p.kran.max)}.`);
   } else if (S.phase === 'steinmetz') {
     set(teil, 'Steinmetzhütte', S.geoFirst ? 'Neu: Formen und Faltschnitte' : 'Formen und Faltschnitte',
-      'Klick die Teile an, die zusammengehören. Drehen darfst du sie in Gedanken.');
+      `${klick()} die Teile an, die zusammengehören. Drehen darfst du sie in Gedanken.`);
   } else if (S.phase === 'tor') {
     set(teil, 'Das Tor', S.torFirst ? 'Neu: Waage und Punkt vor Strich' : 'Waage und Punkt vor Strich',
       `${sprache() ? 'Sag' : 'Tipp'} zuerst die Teilrechnungen. Ihre Ergebnisse bleiben unter dem Bogen stehen. Dann kommt das Zeichen oder das Ergebnis.`);
@@ -242,7 +248,7 @@ function renderHud() {
   else if (it.type === 'falt') txt = 'Fenster für die Kapelle: Welches <b>gefaltete Blatt</b> ergibt <b>aufgefaltet</b> welches Fenster?';
   else if (it.type === 'tor' && it.t.kind === 'waage') txt = 'Welche Seite der Waage ist <b>schwerer</b>? Rechne beide Seiten aus. Dann wähle <b>&lt;</b>, <b>=</b> oder <b>&gt;</b>.';
   else if (it.type === 'tor') txt = 'Rechne die Aufgabe aus. Denk an <b>Punkt vor Strich</b>.';
-  else txt = `Der Kran soll die Ladung bei <b>${fmt(it.t.target)}</b> abladen. ${wii() ? 'Zeig auf die Stelle und drück <b>A</b>.' : 'Klick auf die Stelle.'}`;
+  else txt = `Der Kran soll die Ladung bei <b>${fmt(it.t.target)}</b> abladen. ${wii() ? 'Zeig auf die Stelle und drück <b>A</b>.' : finger() ? 'Finger auflegen, zur Stelle schieben, loslassen.' : 'Klick auf die Stelle.'}`;
   $('#auftrag').innerHTML = txt;
   $('#dots').innerHTML = S.queue.map((_, i) => `<i class="${i < S.qi ? 'done' : i === S.qi ? 'now' : ''}"></i>`).join('');
 }
@@ -252,8 +258,8 @@ function renderScene(view, j, animate) {
   const it = S.item;
   const el = $('#scene');
   el.classList.remove('anim');
-  if (isGeo(it)) return; // zeichnet steinmetz.js
-  if (it.type === 'tor') { if (S.tor) el.innerHTML = sceneTor(it.t, S.tor.L, torView()); return; }
+  if (isGeo(it)) return; // zeichnet steinmetz.js, zugeschnitten in armGeo
+  if (it.type === 'tor') { if (S.tor) el.innerHTML = sceneTor(it.t, S.tor.L, torView()); fitScene(); return; }
   if (it.type === 'abruf') el.innerHTML = sceneAbruf(it.q, view || 'ask', j);
   else if (it.type === 'mauer') el.innerHTML = sceneMauer(it.t, view);
   else if (it.type === 'turm') el.innerHTML = sceneTurm(it.t, view);
@@ -261,8 +267,55 @@ function renderScene(view, j, animate) {
   else if (it.type === 'hof') el.innerHTML = sceneHof(it.t, view);
   else if (it.type === 'hofteil') el.innerHTML = sceneHofteil(it.t, view);
   else el.innerHTML = sceneKran(it.t);
+  fitScene();
   if (animate) { void el.getBoundingClientRect(); el.classList.add('anim'); }
 }
+
+/* Hochformat: Die Szenen sind für 1000 × 520 gezeichnet (16:9-Bühne). Auf der schmalen Bühne wird die viewBox auf den
+   Inhalt zugeschnitten (ohne Boden, Hügel, Wolken), höchstens auf SZENE_MIN_W Breite, also bis 1,67-fach größer.
+   Der Rahmen wächst innerhalb einer Aufgabe nur, damit das Bild beim Antworten nicht hin und her springt. */
+const SZENE_VB = '0 0 1000 520';
+const SZENE_HG = '.ground, .ground2, .k-hill, .k-cloud, .k-castle, defs, style';
+const SZENE_MIN_W = 600;
+const SZENE_RAND = 32;
+let szeneRahmen = null;
+function fitScene() {
+  const svg = $('#scene');
+  if (!HOCH.matches || current !== 's-task' || !S.item) {
+    svg.setAttribute('viewBox', SZENE_VB);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMax meet');
+    szeneRahmen = null;
+    return;
+  }
+  const r = szeneRahmen && szeneRahmen.item === S.item ? szeneRahmen
+    : { item: S.item, x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+  for (const el of svg.children) {
+    if (el.matches(SZENE_HG) || typeof el.getBBox !== 'function') continue;
+    const b = el.getBBox();
+    if (!b.width && !b.height) continue;
+    const m = el.transform && el.transform.baseVal.consolidate();
+    for (const [x, y] of [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]]) {
+      const px = m ? m.matrix.a * x + m.matrix.c * y + m.matrix.e : x;
+      const py = m ? m.matrix.b * x + m.matrix.d * y + m.matrix.f : y;
+      r.x0 = Math.min(r.x0, px); r.x1 = Math.max(r.x1, px); r.y0 = Math.min(r.y0, py); r.y1 = Math.max(r.y1, py);
+    }
+  }
+  if (!(r.x1 > r.x0)) { svg.setAttribute('viewBox', SZENE_VB); return; }
+  szeneRahmen = r;
+  let x0 = Math.max(0, r.x0 - SZENE_RAND);
+  let x1 = Math.min(1000, r.x1 + SZENE_RAND);
+  if (x1 - x0 < SZENE_MIN_W) {
+    x0 = Math.max(0, Math.min(1000 - SZENE_MIN_W, (x0 + x1 - SZENE_MIN_W) / 2));
+    x1 = x0 + SZENE_MIN_W;
+  }
+  // Mit Boden (Baustelle, Kran): unten bis zum Rand und unten ausgerichtet, sonst mittig
+  const boden = !!svg.querySelector('.ground');
+  const y0 = Math.max(0, Math.min(r.y0 - SZENE_RAND, 520 - 200));
+  const y1 = boden ? 520 : Math.max(y0 + 200, Math.min(520, r.y1 + SZENE_RAND));
+  svg.setAttribute('viewBox', `${x0.toFixed(1)} ${y0.toFixed(1)} ${(x1 - x0).toFixed(1)} ${(y1 - y0).toFixed(1)}`);
+  svg.setAttribute('preserveAspectRatio', boden ? 'xMidYMax meet' : 'xMidYMid meet');
+}
+HOCH.addEventListener('change', () => { szeneRahmen = null; if (current === 's-task' && S.item) fitScene(); });
 
 const MIC = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 const AIM = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>';
@@ -281,10 +334,13 @@ function renderPanel() {
     enterBereit();
     return;
   }
-  if (it.type === 'kran') { p.innerHTML = say(AIM, 'Zeig auf die Stelle', clickTxt()); return; }
+  if (it.type === 'kran') {
+    p.innerHTML = finger() ? say(AIM, 'Schieb die Last hin', 'Finger auflegen, schieben, loslassen') : say(AIM, 'Zeig auf die Stelle', clickTxt());
+    return;
+  }
   if (isGeo(it)) {
-    const head = it.type === 'falt' ? say(AIM, 'Blatt und Fenster', 'Erst ein Blatt anklicken, dann sein Fenster')
-      : say(AIM, `${it.t.need} Teile anklicken`, clickTxt());
+    const head = it.type === 'falt' ? say(AIM, 'Blatt und Fenster', `Erst ein Blatt an${finger() ? 'tippen' : 'klicken'}, dann sein Fenster`)
+      : say(AIM, `${it.t.need} Teile an${finger() ? 'tippen' : 'klicken'}`, clickTxt());
     const tip = it.type === 'falt' ? '<div class="note">Jedes Blatt ist zweimal gefaltet und dann ausgeschnitten. Gestrichelt: die Falten.</div>' : '';
     p.innerHTML = head + (S.note || S.hint
       ? `<div class="note${S.hint ? ' warn' : ''}">${S.note}${S.note && S.hint ? '<br>' : ''}${S.hint ? `<b>${nb(S.hint)}</b>` : ''}</div>` : tip);
@@ -482,6 +538,7 @@ function finishBau(firstOk) {
 
 let kranMove = null;
 let kranClick = null;
+let kranFinger = null;
 
 function svgX(evt) {
   const svg = $('#scene');
@@ -523,13 +580,21 @@ function armKran() {
   };
   svg.addEventListener('mousemove', kranMove);
   svg.addEventListener('click', kranClick);
+  // Finger: auflegen und schieben fährt die Laufkatze, Loslassen lädt ab. Ein Klick danach kommt zu spät (state).
+  kranFinger = (e) => {
+    if (e.pointerType === 'mouse') return;
+    if (e.type === 'pointerup') kranClick(e);
+    else if (e.type === 'pointerdown' || e.buttons) kranMove(e);
+  };
+  for (const ev of ['pointerdown', 'pointermove', 'pointerup']) svg.addEventListener(ev, kranFinger);
 }
 
 function disarmKran() {
   const svg = $('#scene');
   if (kranMove) svg.removeEventListener('mousemove', kranMove);
   if (kranClick) svg.removeEventListener('click', kranClick);
-  kranMove = kranClick = null;
+  if (kranFinger) for (const ev of ['pointerdown', 'pointermove', 'pointerup']) svg.removeEventListener(ev, kranFinger);
+  kranMove = kranClick = kranFinger = null;
 }
 
 /** Last absenken; das Tretrad dreht sich mit, solange das Seil abläuft. */
@@ -559,6 +624,7 @@ function armGeo() {
   disarmGeo();
   const it = S.item;
   const play = it.type === 'falt' ? playFalt : playZusammen;
+  queueMicrotask(fitScene);
   geoCtl = play($('#scene'), it.t, {
     onPick: () => snd.soundTick(),
     onRight: (found, total) => {
@@ -612,9 +678,9 @@ function torPanel() {
   const step = torStep();
   const note = S.note || S.hint
     ? `<div class="note${S.hint ? ' warn' : ''}">${nb(S.note)}${S.note && S.hint ? '<br>' : ''}${S.hint ? `<b>${nb(S.hint)}</b>` : ''}</div>` : '';
-  if (step.kind === 'first') return say(AIM, 'Was rechnest du zuerst?', wii() ? 'Zeig auf das Rechenzeichen' : 'Klick auf das Rechenzeichen') + note;
+  if (step.kind === 'first') return say(AIM, 'Was rechnest du zuerst?', wii() ? 'Zeig auf das Rechenzeichen' : `${klick()} auf das Rechenzeichen`) + note;
   if (step.kind === 'sign') {
-    return say(AIM, 'Welches Zeichen passt?', wii() ? 'Zeig drauf, dann A' : 'Klick drauf')
+    return say(AIM, 'Welches Zeichen passt?', wii() ? 'Zeig drauf, dann A' : `${klick()} drauf`)
       + `<div class="signs">${['<', '=', '>'].map((v) => `<button class="btn sign" data-act="sign" data-v="${v}">${SIGN_TXT[v]}</button>`).join('')}</div>` + note;
   }
   const what = step.kind === 'calc' ? partText(step.part) : `${fmt(step.a)} ${step.s} ${fmt(step.b)}`;
@@ -758,7 +824,7 @@ function startBlitz() {
   $('#b-q').style.fontSize = '';
   $('#b-next').hidden = true;
   $('#b-help').hidden = false;
-  $('#b-help').textContent = (sprache() ? `${wii() ? 'Mit B sagen' : 'Sagen'} oder rechts eintippen.` : 'Rechts eintippen und OK drücken.') + ' Es zählt sofort, ohne „Ja“.';
+  $('#b-help').textContent = (sprache() ? `${wii() ? 'Mit B sagen' : 'Sagen'} oder ${HOCH.matches ? 'unten' : 'rechts'} eintippen.` : `${HOCH.matches ? 'Unten' : 'Rechts'} eintippen und OK drücken.`) + ' Es zählt sofort, ohne „Ja“.';
   $('#b-pad').hidden = false;
   show('s-blitz');
   blitzNext();
@@ -930,7 +996,8 @@ function renderAreas(parts) {
     + '<li class="burg-legend"><span><i class="st st-g"></i>Gerüst</span><span><i class="st st-s"></i>Stein</span><span><i class="st st-f"></i>Fahne</span></li>';
 }
 
-const burgHint = () => `Zeig mit der ${wii() ? 'Fernbedienung' : 'Maus'} auf ein Bauteil. Dann steht hier, was es ist.`;
+const burgHint = () => (finger() ? 'Tipp auf ein Bauteil. Dann steht hier, was es ist.'
+  : `Zeig mit der ${wii() ? 'Fernbedienung' : 'Maus'} auf ein Bauteil. Dann steht hier, was es ist.`);
 
 function burgHover(h) {
   const el = $('#burg-info');
@@ -973,7 +1040,7 @@ async function showBurg(mode) {
     if (token !== burgToken || current !== 's-burg') return;
     burgCtl = await m.openBurg($('#burg-view'), {
       parts, shown, farbe: burgFarbe(p), onHover: burgHover, onStep: burgSound,
-      inset: () => window.innerWidth - $('.burg-side').getBoundingClientRect().left,
+      inset: burgInset,
       onFps: (f) => { $('#burg-fps').textContent = `${f} fps`; },
     });
     if (token !== burgToken || current !== 's-burg') { burgCtl.stop(); return; }
@@ -983,6 +1050,13 @@ async function showBurg(mode) {
     $('#burg-info').textContent = 'Die Burg lässt sich gerade nicht zeigen. Weiter geht es trotzdem.';
     logEvent(p, { type: 'burg-fehler', session: S.sessionId, at: new Date().toISOString(), msg: String((err && err.message) || err) });
   }
+}
+
+/** Von den Karten verdeckte Ränder der 3D-Ansicht: am TV die Leiste rechts, hochkant Titel oben und Leiste unten (style.css). */
+function burgInset() {
+  const side = $('.burg-side').getBoundingClientRect();
+  if (!HOCH.matches) return { rechts: window.innerWidth - side.left };
+  return { oben: $('.burg-head').getBoundingClientRect().bottom, unten: window.innerHeight - side.top };
 }
 
 function burgStop() {
@@ -1081,7 +1155,7 @@ function renderStart() {
     return `<button class="pcard" data-id="${esc(x.id)}" style="--i:${i};--c1:${c1};--c2:${c2};--c3:${c3};--len:${len}">`
       + `<span class="pc-in"><img src="assets/ui/${esc(x.bild)}.png" alt=""><span class="pc-name">${esc(x.name)}</span></span></button>`;
   }).join('');
-  const zeigen = wii() ? 'Klicken: zielen und A drücken.' : 'Klicken mit der Maus.';
+  const zeigen = wii() ? 'Klicken: zielen und A drücken.' : finger() ? 'Tippen mit dem Finger.' : 'Klicken mit der Maus.';
   const antworten = !sprache() ? 'Antworten: Zahl eintippen und OK.'
     : wii() ? 'Antworten: B gedrückt halten, die Zahl sagen, loslassen.' : 'Antworten: Sprach-Taste halten, die Zahl sagen, loslassen.';
   $('#start-help').textContent = `${zeigen} ${antworten}`;
@@ -1524,4 +1598,4 @@ window.addEventListener('mq-abgemeldet', async () => {
 })();
 
 // Nur zum Testen (Adresse mit ?debug): Zugriff auf Ablauf und Burg
-if (DEBUG.has('debug')) window.__mq = { S, showBurg, finishRound, choosePlayer, saveProfile, startPhase, openSetup, cfg: () => CFG };
+if (DEBUG.has('debug')) window.__mq = { S, showBurg, finishRound, choosePlayer, saveProfile, startPhase, startBlitz, showEltern, showAlbum, openSetup, cfg: () => CFG };

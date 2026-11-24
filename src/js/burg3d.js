@@ -471,8 +471,20 @@ function makeGraphics() {
     scene.add(o);
   }
 
-  const camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.5, 200);
+  const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.5, 200);
   return { renderer, scene, camera, world: null, ctl: null };
+}
+
+// Senkrechter Bildwinkel des ganzen Bildes (h). Die freie Fläche (fw × fh, zwischen den Karten) soll mindestens so viel
+// der Burg zeigen wie am TV: dort ist sie so hoch wie das Bild und ca. 1,23 Bildhöhen breit (links der Leiste).
+// Auf dem Handy hochkant wird der Winkel deshalb größer; der verzerrte Rand liegt unter den Karten.
+const FOV = 32;
+const FREI_BREIT = 1.2;
+const GRAD = Math.PI / 180;
+export function bildwinkel(h, fw, fh) {
+  if (!(h > 0 && fw > 0 && fh > 0)) return FOV;
+  const k = Math.max(1, (FREI_BREIT * h) / fw, h / fh);
+  return (2 * Math.atan(Math.tan((FOV / 2) * GRAD) * k)) / GRAD;
 }
 
 // ---------- Öffnen, Animation, Zeigen ----------
@@ -481,7 +493,7 @@ function makeGraphics() {
  * Burg im Element el anzeigen.
  * opts: parts, shown (Stufe je Teil vor der Bauabnahme, sonst null), farbe,
  *       onHover({part}|{area}|null), onStep(part, stage), onFps(fps),
- *       inset() → Breite in Pixeln, die rechts von einer Leiste verdeckt ist
+ *       inset() → verdeckte Ränder in Pixeln { rechts, oben, unten } (Leiste rechts am TV, Titel und Leiste im Hochformat)
  */
 export async function openBurg(el, opts) {
   await loadAssets();
@@ -497,9 +509,10 @@ export async function openBurg(el, opts) {
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     camera.aspect = w / h;
-    // Bildmitte in die freie Fläche links der Leiste schieben
-    const inset = opts.inset ? opts.inset() : 0;
-    if (inset > 0) camera.setViewOffset(w, h, inset / 2, 0, w, h);
+    // Bildmitte in die freie Fläche zwischen den Karten schieben
+    const { rechts = 0, oben = 0, unten = 0 } = (opts.inset && opts.inset()) || {};
+    camera.fov = bildwinkel(h, w - rechts, h - oben - unten);
+    if (rechts > 0 || oben > 0 || unten > 0) camera.setViewOffset(w, h, rechts / 2, (unten - oben) / 2, w, h);
     else camera.clearViewOffset();
     camera.updateProjectionMatrix();
   };
@@ -562,8 +575,10 @@ export async function openBurg(el, opts) {
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     pickDirty = true;
   };
-  const onLeave = () => { ndc.set(2, 2); pickDirty = true; };
+  // Finger: Antippen wählt ein Bauteil, es bleibt gewählt bis zum nächsten Tippen (kein Verlassen beim Abheben)
+  const onLeave = (e) => { if (e.pointerType !== 'mouse') return; ndc.set(2, 2); pickDirty = true; };
   renderer.domElement.addEventListener('pointermove', onMove);
+  renderer.domElement.addEventListener('pointerdown', onMove);
   renderer.domElement.addEventListener('pointerleave', onLeave);
   const pick = () => {
     ray.setFromCamera(ndc, camera);
@@ -662,6 +677,7 @@ export async function openBurg(el, opts) {
       running = false;
       renderer.setAnimationLoop(null);
       renderer.domElement.removeEventListener('pointermove', onMove);
+      renderer.domElement.removeEventListener('pointerdown', onMove);
       renderer.domElement.removeEventListener('pointerleave', onLeave);
       window.removeEventListener('resize', resize);
       tweens.splice(0).forEach((tw) => tw.res());

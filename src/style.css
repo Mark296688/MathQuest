@@ -151,7 +151,7 @@ h2 { font-size: 3.4rem; line-height: 1.1; }
 .dots i.done { background: #43b649; }
 .dots i.now { background: var(--outline); }
 .stage { min-width: 0; min-height: 0; display: flex; }
-#scene { width: 100%; height: 100%; display: block; }
+#scene { width: 100%; height: 100%; display: block; touch-action: none; } /* Finger: Kran schieben statt Seite verschieben */
 .panel { padding: 1.4rem; display: flex; flex-direction: column; justify-content: center; gap: 1rem; min-height: 0; }
 .panel .btn { width: 100%; }
 .say { display: grid; justify-items: center; gap: .5rem; text-align: center; padding: .3rem 0 .6rem; }
@@ -460,7 +460,7 @@ h2 { font-size: 3.4rem; line-height: 1.1; }
 @keyframes wiggle { 25% { transform: rotate(-8deg) scale(1.08); } 60% { transform: rotate(6deg) scale(1.08); } }
 @keyframes kpuff { 0% { opacity: .95; transform: scale(.3); } 100% { opacity: 0; transform: translateY(-8px) scale(1.5); } }
 @keyframes kstar { from { transform: scale(0) rotate(-40deg); } }
-@keyframes fall { to { transform: translate(var(--dx), 52rem) rotate(var(--rot)); } }
+@keyframes fall { to { transform: translate(var(--dx), calc(100vh + 4rem)) rotate(var(--rot)); } }
 @keyframes shake { 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
 @keyframes blink { to { fill: rgba(255, 214, 90, .25); } }
 /* Faltschnitt aufklappen: Kopie an der senkrechten Falte (x = --f) bzw. der waagerechten Falte (y = 0) spiegeln */
@@ -509,3 +509,120 @@ body:not(.online) .legal { display: none; }
 body.idle .floaters i, body.idle .logo img, body.idle .medal::before, body.idle .intro-img, body.idle .btn.go::after,
 body.idle .album-head img { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- Hochformat (Handy oder Tablet hochkant, ab Seitenverhältnis 4:5) ----------
+   Bühne 40rem breit statt 80 × 45rem: bei 390 px Breite ist 1rem knapp 10 px. Höhe je nach Gerät ca. 74–87rem,
+   deshalb alles untereinander, und wo es länger wird, scrollt der Bildschirm. app.js fragt dieselbe Grenze ab (HOCH). */
+@media (max-aspect-ratio: 4/5) {
+  html { font-size: min(2.5vw, 1.35vh); font-size: min(2.5vw, 1.35svh); }
+  .screen { padding: .9rem; }
+  h2 { font-size: 2.8rem; }
+  .sub { font-size: 1.7rem; }
+
+  /* Start: Logo, Karten, Knöpfe untereinander; die Zahlen schweben oben über dem Logo */
+  .start { display: flex; flex-direction: column; align-items: center; gap: 1.4rem; padding: 7rem 1rem 1.4rem; overflow-y: auto; }
+  .start-main { position: static; width: auto; flex: 1 0 auto; gap: 1.4rem; }
+  .logo img { width: 34rem; }
+  .start-main:has(.players.n5, .players.n6) .logo img { width: 30rem; }
+  .floaters i { left: calc((var(--x) - 58%) * 2.4); top: calc(var(--y) * .1 + .4rem); font-size: 3.4rem; }
+  .players { flex-wrap: wrap; gap: 1.2rem; max-width: 38rem; }
+  .players.n3 .pcard { width: 11.6rem; height: 13rem; }
+  .players.n3 .pc-in img { width: 7.4rem; height: 6.4rem; }
+  .players.n3 .pc-name { font-size: min(2.6rem, calc(15.5rem / var(--len, 4))); }
+  .players.n4 { gap: 1.2rem 1.6rem; max-width: 26rem; }
+  .players.n4 .pcard { width: 12rem; height: 12.4rem; }
+  .players.n5, .players.n6 { gap: 1rem 1.2rem; max-width: 36rem; }
+  .players.n5 .pcard, .players.n6 .pcard { width: 11rem; height: 10.4rem; }
+  .strip { font-size: 1.4rem; max-width: 34rem; }
+  .corner-btns { position: static; flex-wrap: wrap; justify-content: center; }
+  .corner-btns .btn.small { font-size: 1.5rem; min-height: 3.8rem; }
+  .start-legal { position: static; }
+
+  /* Phasen-Einstieg */
+  .intro-card { width: auto; max-width: none; padding: 1rem 1.4rem 2rem; }
+  .intro-card h2 { font-size: 3rem; }
+  .intro .help { font-size: 1.5rem; }
+
+  /* Aufgabe: Auftrag oben, Bild in der Mitte, Antwort-Feld unten */
+  .task { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: .8rem; }
+  .hud { gap: .8rem; padding: .6rem .8rem .7rem .7rem; align-items: flex-start; }
+  .hud-icon { width: 3.6rem; height: 3.6rem; }
+  .phase { font-size: 1.3rem; }
+  .auftrag { font-size: 1.8rem; line-height: 1.3; }
+  .prog { gap: .6rem; }
+  .dots { max-width: 9rem; }
+  .prog .btn.small { font-size: 1.4rem; min-height: 3.4rem; }
+  .panel { padding: 1rem 1.2rem 1.2rem; gap: .8rem; }
+  .say { grid-template-columns: auto 1fr; justify-items: start; text-align: left; align-items: center; gap: 0 1rem; padding: 0; }
+  .say svg { grid-row: span 2; width: 4rem; height: 4rem; }
+  .say-t { font-size: 2.2rem; }
+  .say-t br { display: none; }
+  .say-s, .note, .msg, .way, .levelup { font-size: 1.5rem; }
+  .verdict { font-size: 2.6rem; }
+  .ipad-t { font-size: 1.8rem; }
+  .ipad-display, .pad-display { min-height: 4.6rem; line-height: 4.6rem; font-size: 3.6rem; }
+  .ipad-keys { gap: .6rem; }
+  .ipad-keys .btn { font-size: 2.6rem; min-height: 4.6rem; }
+  .heard { grid-template-columns: auto auto; align-items: baseline; justify-content: center; gap: 0 1rem; }
+  .heard .raw { grid-column: 1 / -1; }
+  .bignum { font-size: 5rem; }
+
+  /* Turnier: Rechnung oben, Ziffernfeld darunter */
+  .blitz { grid-template-rows: auto auto minmax(0, 1fr); gap: .8rem; }
+  .blitz > div:last-child:empty { display: none; }
+  .bscore { font-size: 1.5rem; }
+  .bscore b { font-size: 2.1rem; }
+  .bmid { flex-direction: column; gap: .8rem; }
+  .bmain { flex: 1 1 0; min-height: 0; gap: .6rem; }
+  .bq { font-size: 7.5rem; }
+  .bfb { font-size: 2.6rem; min-height: 3.2rem; }
+  .bhelp { font-size: 1.4rem; }
+  .bpad { width: auto; flex: none; padding: 1rem 1.2rem; gap: .6rem; }
+  .bpad .keys { flex: none; grid-auto-rows: 4.8rem; gap: .6rem; }
+  .bpad .keys .btn { font-size: 2.6rem; }
+
+  /* Album, Eltern, Einstellungen: eine Spalte, der Bildschirm scrollt */
+  .album { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; align-content: start; overflow-y: auto; }
+  .album-head img { width: 5.4rem; height: 4.8rem; }
+  .done-list li { font-size: 1.5rem; }
+  .tafel span { height: 2.6rem; font-size: 1.2rem; }
+  .legend { font-size: 1.3rem; gap: .4rem 1rem; }
+  .card h3 { font-size: 1.7rem; }
+  .endbtns { flex-wrap: wrap; gap: .9rem; }
+  .eltern { grid-template-rows: none; align-content: start; overflow-y: auto; }
+  .eltern-cols { grid-template-columns: minmax(0, 1fr); }
+  .eltern .card { overflow: visible; font-size: 1.3rem; }
+  .setup { align-items: flex-start; padding: .6rem; }
+  .setup-card { padding: 1rem 1.2rem; }
+  .setup-cols { grid-template-columns: minmax(0, 1fr); gap: 1.4rem; }
+  .setup-welcome, .srow.sdel p, .srow.spick p { font-size: 1.4rem; }
+  .sname { font-size: 1.9rem; }
+  .sfarbe { width: 2.8rem; height: 2.8rem; }
+  .sfarben { gap: .45rem; }
+  .slabel { font-size: 1.35rem; }
+  .sopt b { font-size: 1.7rem; }
+  .sopt span { font-size: 1.3rem; }
+  .skform, .skmsg { font-size: 1.4rem; }
+  .btn.small { font-size: 1.4rem; min-height: 3.6rem; }
+
+  /* Burg: Titel oben, Leiste als Blatt unten. Die Kamera rückt die Burg in die freie Fläche dazwischen (burg3d.js). */
+  .burg-head { left: .8rem; right: .8rem; top: .8rem; max-width: none; padding: .7rem 1.1rem; }
+  .burg-head h2 { font-size: 2.3rem; }
+  .burg-new { font-size: 1.4rem; }
+  .burg-side { left: .8rem; right: .8rem; top: auto; bottom: .8rem; width: auto; max-height: 46%; padding: 1rem 1.2rem; gap: .6rem; }
+  .burg-areas { font-size: 1.3rem; gap: .35rem; }
+  .burg-areas li b { font-size: 1.4rem; }
+  .burg-areas .thema { font-size: 1.15rem; }
+  .burg-areas li.closed, .burg-areas li.burg-legend { font-size: 1.15rem; }
+  .burg-info { flex: 1 1 4rem; font-size: 1.35rem; padding: .6rem .9rem; }
+  .burg-info b { font-size: 1.5rem; }
+}
+
+/* Finger statt Zeiger (Handy, Tablet): Das Hover-Leuchten bliebe nach dem Antippen am Knopf hängen und sähe aus wie
+   eine Auswahl. Drücken (:active) zeigt weiter, dass der Knopf angekommen ist. */
+@media (hover: none) {
+  .btn:hover { transform: none; box-shadow: inset 0 .28rem 0 rgba(255, 255, 255, .6), inset 0 -.36rem 0 rgba(0, 0, 0, .14), 0 .3rem 0 var(--outline); }
+  .btn:active { transform: translateY(.15rem) scale(.98); box-shadow: inset 0 .28rem 0 rgba(255, 255, 255, .6), inset 0 -.2rem 0 rgba(0, 0, 0, .14), 0 .1rem 0 var(--outline); }
+  .pcard:hover { transform: none; box-shadow: inset 0 .22rem 0 rgba(255, 255, 255, .45), inset 0 -.3rem 0 rgba(0, 0, 0, .2), 0 .4rem 0 var(--outline), 0 1rem 1.6rem rgba(10, 30, 60, .35); }
+  .pcard:hover img { animation: none; }
+}
