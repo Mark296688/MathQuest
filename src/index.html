@@ -5,11 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MathQuest</title>
 <link rel="icon" href="assets/ui/icon.png">
+<!-- Als App installierbar („Zum Startbildschirm hinzufügen“): startet dann im Vollbild ohne Browser-Hinweis -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/ui/app-apple.png">
+<meta name="theme-color" content="#9fd3fb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MathQuest">
 <link rel="stylesheet" href="style.css">
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }</script>
 </head>
 <body data-screen="s-start">
-<textarea id="sink" aria-hidden="true" tabindex="-1"></textarea>
+<textarea id="sink" aria-hidden="true" tabindex="-1" inputmode="none"></textarea>
 
 <section id="s-start" class="screen start">
   <div class="floaters" aria-hidden="true">

@@ -92,7 +92,9 @@ const S = {
 async function choosePlayer(id) {
   const cfg = CFG.profile.find((x) => x.id === id);
   if (!cfg) return;
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+  // Als installierte App (manifest.json, display „fullscreen“) ist das Spiel schon im Vollbild. Dort nicht noch einmal
+  // anfordern, sonst zeigt der Browser seinen Hinweis zum Beenden des Vollbilds über dem Ziffernfeld (Handy-Test 24.11.2026).
+  if (!document.fullscreenElement && !matchMedia('(display-mode: fullscreen)').matches) document.documentElement.requestFullscreen().catch(() => {});
   S.p = await loadProfile(cfg);
   S.sessionId = `${id}-${new Date().toISOString()}`;
   S.mark = Date.now();
@@ -1529,9 +1531,17 @@ function blitzKey(e) {
   $('#b-pad-display').textContent = B.pad;
 }
 
-// Der Fokus bleibt auf einem unsichtbaren Feld, damit Strg+V immer ankommt. Nicht in Einstellungen und Anmeldung (Eingabefelder).
+// Bei „Sprechen“ bleibt der Fokus auf einem unsichtbaren Feld, damit Strg+V (Spracherkennung) immer ankommt.
+// Sonst kein Eingabefeld: Am Handy öffnete der Fokus darauf nach jedem Tippen die Bildschirm-Tastatur (Test des Users
+// 24.11.2026, online). Ziffern und Enter von einer echten Tastatur kommen auch so an (keydown am document); den zuletzt
+// geklickten Knopf nicht fokussiert lassen, sonst drückt ihn die Leertaste noch einmal. Nicht in Einstellungen und Anmeldung.
 const sink = $('#sink');
-const refocus = () => { if (!formScreen() && document.activeElement !== sink) sink.focus({ preventScroll: true }); };
+const refocus = () => {
+  if (formScreen()) return;
+  if (sprache()) { if (document.activeElement !== sink) sink.focus({ preventScroll: true }); return; }
+  const a = document.activeElement;
+  if (a && a !== document.body && a.matches('button, textarea')) a.blur();
+};
 document.addEventListener('click', () => setTimeout(refocus, 0));
 window.addEventListener('focus', refocus);
 document.addEventListener('fullscreenchange', refocus);
@@ -1559,6 +1569,7 @@ async function ladeEinstellungen() {
   renderStart();
   if (!CFG.profile.length) openSetup(true);
   else show('s-start');
+  refocus(); // erst jetzt ist bekannt, ob „Sprechen“ eingestellt ist
 }
 
 async function anmelden(opts = {}) {
