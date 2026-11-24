@@ -13,6 +13,7 @@ import { loadProfile, saveProfile, logEvent, loadSettings, saveSettings, setKont
 import { kontoStatus, linkAusMail, anmeldung, abmelden, passwortAendern, kontoLoeschen } from './konto.js';
 import { BILDER, FARB_IDS, MAX_PROFILE, MAX_NAME, defaultEinstellungen, neuesProfil, freieId, cleanName } from './einstellungen.js';
 import { sceneAbruf, sceneMauer, sceneTurm, sceneReihe, sceneHof, sceneHofteil, sceneKran, kranFlag, KX0, KX1, kx, KDROP, KHOOK, KWHEEL } from './scenes.js';
+import { platz, schritt, springt, SICHTBAR } from './buehne.js';
 import * as snd from './sound.js';
 
 const $ = (s) => document.querySelector(s);
@@ -92,6 +93,7 @@ const S = {
 async function choosePlayer(id) {
   const cfg = CFG.profile.find((x) => x.id === id);
   if (!cfg) return;
+  try { localStorage.setItem(LETZTER, id); } catch { /* gesperrt: dann steht nächstes Mal das erste Profil in der Mitte */ }
   // Als installierte App (manifest.json, display „fullscreen“) ist das Spiel schon im Vollbild. Dort nicht noch einmal
   // anfordern, sonst zeigt der Browser seinen Hinweis zum Beenden des Vollbilds über dem Ziffernfeld (Handy-Test 24.11.2026).
   // iPhone-Safari kennt requestFullscreen nicht: ohne „?.“ brach die Profilwahl dort mit einem TypeError ab (24.11.2026).
@@ -1147,22 +1149,72 @@ const CARD_COLORS = {
   gelb: ['#ffe58a', '#f5b829', '#b07a0c'],
 };
 
+// Bühne: Ein Profil steht groß in der Mitte, die anderen kleiner daneben. Karte am Rand anklicken, Pfeil, Wischen oder
+// Pfeiltaste holt ein anderes in die Mitte, der Knopf „Los, <Name>!“ (oder die mittlere Karte) startet.
+// Vorher startete jede Karte sofort: Ohne beschrifteten Knopf war nicht jedem klar, wo es losgeht (Wunsch des Users 24.11.2026).
+const LETZTER = 'mathquest-letzter'; // wer in diesem Browser zuletzt gespielt hat, steht beim nächsten Mal in der Mitte
+const BUEHNE = { sel: 0, wischAb: null, wischBis: 0 };
+
 function renderStart() {
   const list = CFG.profile;
   const box = $('#players');
   box.className = `players n${Math.min(list.length, 6)}`;
-  box.innerHTML = list.map((x, i) => {
+  $('#buehne').className = `buehne n${Math.min(list.length, 6)}`;
+  box.innerHTML = list.map((x) => {
     const [c1, c2, c3] = CARD_COLORS[x.farbe] || CARD_COLORS.blau;
     // Schriftgröße nach Länge: lange Namen mit Leerzeichen oder Bindestrich dürfen umbrechen, nach dem längsten Teil
-    const len = Math.max(4, x.name.length <= 9 ? x.name.length : Math.max(...x.name.split(/[\s-]/).map((w) => w.length + 1)));
-    return `<button class="pcard" data-id="${esc(x.id)}" style="--i:${i};--c1:${c1};--c2:${c2};--c3:${c3};--len:${len}">`
+    // (und so klein, dass der Name in zwei Zeilen passt: drei Zeilen ragten unten aus der Karte)
+    const len = Math.max(4, x.name.length <= 9 ? x.name.length : Math.max(Math.ceil(x.name.length * .62), ...x.name.split(/[\s-]/).map((w) => w.length + 1)));
+    return `<button class="pcard" data-id="${esc(x.id)}" style="--c1:${c1};--c2:${c2};--c3:${c3};--len:${len}">`
       + `<span class="pc-in"><img src="assets/ui/${esc(x.bild)}.png" alt=""><span class="pc-name">${esc(x.name)}</span></span></button>`;
   }).join('');
+  let letzter = null;
+  try { letzter = localStorage.getItem(LETZTER); } catch { /* gesperrt: dann das erste Profil */ }
+  BUEHNE.sel = Math.max(0, list.findIndex((x) => x.id === letzter));
+  stelleBuehne(false);
+  const mehrere = list.length > 1;
+  $('#pf-l').hidden = $('#pf-r').hidden = !mehrere;
   const zeigen = wii() ? 'Klicken: zielen und A drücken.' : finger() ? 'Tippen mit dem Finger.' : 'Klicken mit der Maus.';
   const antworten = !sprache() ? 'Antworten: Zahl eintippen und OK.'
     : wii() ? 'Antworten: B gedrückt halten, die Zahl sagen, loslassen.' : 'Antworten: Sprach-Taste halten, die Zahl sagen, loslassen.';
   $('#start-help').textContent = `${zeigen} ${antworten}`;
 }
+
+/** Karten auf ihre Plätze stellen und den Start-Knopf beschriften. bewegt: mit Gleiten und Hüpfer (Wechsel), sonst sofort (Aufbau). */
+function stelleBuehne(bewegt) {
+  const list = CFG.profile;
+  const n = list.length;
+  const los = $('#btn-los');
+  los.hidden = !n;
+  if (!n) return;
+  [...$('#players').children].forEach((el, i) => {
+    const d = platz(i, BUEHNE.sel, n);
+    const alt = Number(el.dataset.d);
+    el.classList.remove('rein-l', 'rein-r');
+    if (bewegt && springt(alt, d)) { void el.offsetWidth; el.classList.add(d > 0 ? 'rein-r' : 'rein-l'); }
+    el.dataset.d = d;
+    el.classList.toggle('weg', Math.abs(d) > SICHTBAR);
+    el.tabIndex = Math.abs(d) > SICHTBAR ? -1 : 0;
+    el.setAttribute('aria-label', d === 0 ? `${list[i].name}: starten` : `${list[i].name} auswählen`);
+    if (d === 0) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
+  });
+  const x = list[BUEHNE.sel];
+  const [c1, c2] = CARD_COLORS[x.farbe] || CARD_COLORS.blau;
+  los.textContent = `Los, ${x.name}!`;
+  los.style.cssText = `--b1:${c1};--b2:${c2};--len:${Math.max(12, x.name.length + 7)}`;
+  // Bei zwei Profilen ist die Reihe am Rand zu Ende: Der Pfeil dorthin ist blass und tut nichts.
+  $('#pf-l').disabled = schritt(BUEHNE.sel, -1, n) === BUEHNE.sel;
+  $('#pf-r').disabled = schritt(BUEHNE.sel, 1, n) === BUEHNE.sel;
+  if (bewegt) { los.classList.remove('hupf'); void los.offsetWidth; los.classList.add('hupf'); }
+}
+
+function waehle(i) {
+  if (i === BUEHNE.sel || i < 0 || i >= CFG.profile.length) return;
+  BUEHNE.sel = i;
+  stelleBuehne(true);
+}
+const blaettern = (dir) => waehle(schritt(BUEHNE.sel, dir, CFG.profile.length));
+const losGehts = () => { const x = CFG.profile[BUEHNE.sel]; if (x) choosePlayer(x.id).catch(nurAbgemeldet); };
 
 // ---------- Einstellungen ----------
 
@@ -1386,7 +1438,33 @@ $('#b-keys').addEventListener('click', (e) => {
 
 // ---------- Ereignisse ----------
 
-$('#players').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) choosePlayer(b.dataset.id).catch(nurAbgemeldet); });
+// Profilwahl: Karte am Rand holt sich in die Mitte, die mittlere Karte startet wie der Knopf darunter.
+$('#players').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || now() < BUEHNE.wischBis) return; // der Klick am Ende eines Wischens zählt nicht
+  const i = CFG.profile.findIndex((x) => x.id === b.dataset.id);
+  if (i === BUEHNE.sel) losGehts(); else waehle(i);
+});
+$('#btn-los').addEventListener('click', losGehts);
+$('#pf-l').addEventListener('click', () => blaettern(-1));
+$('#pf-r').addEventListener('click', () => blaettern(1));
+// Wischen (Finger, auch Maus): nach links kommt die rechte Karte. Erst ab einem deutlichen Weg, damit ein Klick
+// mit leicht wackelndem Wii-Zeiger ein Klick bleibt. Hoch und runter gehört dem Scrollen (touch-action in style.css).
+{
+  const box = $('#buehne');
+  box.addEventListener('pointerdown', (e) => { BUEHNE.wischAb = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
+  box.addEventListener('pointercancel', () => { BUEHNE.wischAb = null; });
+  box.addEventListener('dragstart', (e) => e.preventDefault()); // sonst zieht die Maus das Wappenbild aus der Karte, statt zu wischen
+  box.addEventListener('pointerup', (e) => {
+    const a = BUEHNE.wischAb;
+    BUEHNE.wischAb = null;
+    if (!a || a.id !== e.pointerId) return;
+    const dx = e.clientX - a.x;
+    if (Math.abs(dx) < Math.max(40, window.innerWidth * .06) || Math.abs(dx) < Math.abs(e.clientY - a.y) * 1.5) return;
+    BUEHNE.wischBis = now() + 350;
+    blaettern(dx < 0 ? 1 : -1);
+  });
+}
 $('#btn-go').addEventListener('click', goPhase);
 $('#btn-quit').addEventListener('click', finishRound);
 $('#b-quit').addEventListener('click', () => { if (B.on) blitzFinish(true); else finishRound(); });
@@ -1488,6 +1566,7 @@ function enterKnopf() {
   if (current === 's-blitz') return B.on ? null : $('#b-next');
   if (current === 's-burg') return $('#burg-next');
   if (current === 's-album') return $('#btn-more');
+  if (current === 's-start') return $('#btn-los');
   return null;
 }
 
@@ -1504,6 +1583,7 @@ function enterDruecken(e) {
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.altKey || e.metaKey || formScreen()) return;
   if (e.key === 'Enter' && enterDruecken(e)) return;
+  if (current === 's-start' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); blaettern(e.key === 'ArrowLeft' ? -1 : 1); return; }
   if (current === 's-blitz') { blitzKey(e); return; }
   const waiting = current === 's-task' && S.state === 'wait';
   if (!sprache() && waiting && /^([0-9]|Backspace|Enter)$/.test(e.key)) {

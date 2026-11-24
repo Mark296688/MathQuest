@@ -31,7 +31,13 @@
   <div class="start-main">
     <h1 class="logo"><img src="assets/ui/logo.png" alt="MathQuest"></h1>
     <div class="ribbon">Wer spielt?</div>
-    <div class="players" id="players"></div>
+    <!-- Bühne: ein Profil in der Mitte, die anderen daneben (js/buehne.js). Start mit dem Knopf darunter. -->
+    <div class="buehne" id="buehne">
+      <button class="pfeil" id="pf-l" aria-label="Profil links davon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg></button>
+      <div class="players" id="players"></div>
+      <button class="pfeil" id="pf-r" aria-label="Profil rechts davon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l8 8-8 8"/></svg></button>
+    </div>
+    <button class="btn go los" id="btn-los"></button>
     <p class="help strip" id="start-help"></p>
     <p class="warnbox" id="srv-warn" hidden>Der MathQuest-Server läuft nicht. Gespeichert wird nur im Browser. Bitte über die Verknüpfung „MathQuest“ oder MathQuest.cmd starten.</p>
   </div>
