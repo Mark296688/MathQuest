@@ -37,9 +37,15 @@ const sprache = () => CFG.bedienung.antworten === 'sprache';
 const holdTxt = () => (wii() ? 'B halten' : 'Sprach-Taste halten');
 const clickTxt = () => (wii() ? 'Zielen, dann A drücken' : 'Mit der Maus anklicken');
 let current = 's-start';
+// Enter drückt den grünen Hauptknopf (siehe enterKnopf), aber erst kurz nachdem er erschienen ist:
+// Wer Enter doppelt drückt oder hält, soll nicht an „Richtig!“ und am Rechenweg vorbeirauschen.
+const ENTER_PAUSE_MS = 500;
+let enterAb = 0;
+const enterBereit = () => { enterAb = now() + ENTER_PAUSE_MS; };
 function show(id) {
   if (current === 's-burg' && id !== 's-burg') burgStop();
   current = id;
+  enterBereit();
   document.body.dataset.screen = id; // style.css wählt danach den Hintergrund
   SCREENS.forEach((s) => { $('#' + s).hidden = s !== id; });
 }
@@ -272,6 +278,7 @@ function renderPanel() {
       + (r.way ? `<p class="way">Rechenweg:<br><b>${nb(r.way)}</b></p>` : '')
       + (r.extra ? `<p class="levelup">${r.extra}</p>` : '')
       + `<button class="btn primary" data-act="next">Weiter</button>`;
+    enterBereit();
     return;
   }
   if (it.type === 'kran') { p.innerHTML = say(AIM, 'Zeig auf die Stelle', clickTxt()); return; }
@@ -835,6 +842,7 @@ function blitzFinish(quit) {
   $('#b-help').hidden = true;
   $('#b-pad').hidden = true;
   $('#b-next').hidden = false;
+  enterBereit();
   if (newRecord) { snd.soundRecord(); confetti(); } else snd.soundOk();
 }
 
@@ -1395,9 +1403,30 @@ function unheard() {
   renderPanel();
 }
 
+/** Der grüne Hauptknopf, den Enter drückt (Wunsch 24.11.2026). Nie „Beenden“ oder „Fertig für heute“.
+ *  null, solange eine Antwort erwartet wird: Dann ist Enter „OK“. */
+function enterKnopf() {
+  if (current === 's-intro') return $('#btn-go');
+  if (current === 's-task') return S.state === 'result' ? $('#panel [data-act="next"]') : null;
+  if (current === 's-blitz') return B.on ? null : $('#b-next');
+  if (current === 's-burg') return $('#burg-next');
+  if (current === 's-album') return $('#btn-more');
+  return null;
+}
+
+/** Enter auf den Hauptknopf. true, wenn die Taste damit erledigt ist. */
+function enterDruecken(e) {
+  const b = enterKnopf();
+  if (!b || b.hidden || b.disabled) return false;
+  e.preventDefault();
+  if (!e.repeat && now() >= enterAb) b.click();
+  return true;
+}
+
 // Tastatur: Ziffern tippen, Enter. Bei „Ziffern tippen“ zählt Enter sofort, sonst kommt die Rückfrage wie bei der Sprache.
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.altKey || e.metaKey || formScreen()) return;
+  if (e.key === 'Enter' && enterDruecken(e)) return;
   if (current === 's-blitz') { blitzKey(e); return; }
   const waiting = current === 's-task' && S.state === 'wait';
   if (!sprache() && waiting && /^([0-9]|Backspace|Enter)$/.test(e.key)) {
