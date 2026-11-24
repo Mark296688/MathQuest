@@ -15,6 +15,13 @@ test('src/_headers: CSP erlaubt genau das Importmap-Skript aus index.html', () =
   assert.ok(kopf.includes(hash), `src/_headers braucht ${hash}`);
 });
 
+test('app.js: Vollbild nur anfordern, wenn der Browser es kann (iPhone-Safari hat kein requestFullscreen)', () => {
+  const app = readFileSync(new URL('../src/js/app.js', import.meta.url), 'utf8');
+  const aufrufe = [...app.matchAll(/requestFullscreen\S*/g)].map((m) => m[0]).filter((a) => a.includes('('));
+  assert.ok(aufrufe.length > 0, 'Aufruf gefunden');
+  for (const a of aufrufe) assert.ok(a.startsWith('requestFullscreen?.()?.'), `ungeschützter Aufruf: ${a}`);
+});
+
 let worker; let d1; let migriere; let aufraeumen;
 let fehlt = false;
 try {

@@ -94,7 +94,8 @@ async function choosePlayer(id) {
   if (!cfg) return;
   // Als installierte App (manifest.json, display „fullscreen“) ist das Spiel schon im Vollbild. Dort nicht noch einmal
   // anfordern, sonst zeigt der Browser seinen Hinweis zum Beenden des Vollbilds über dem Ziffernfeld (Handy-Test 24.11.2026).
-  if (!document.fullscreenElement && !matchMedia('(display-mode: fullscreen)').matches) document.documentElement.requestFullscreen().catch(() => {});
+  // iPhone-Safari kennt requestFullscreen nicht: ohne „?.“ brach die Profilwahl dort mit einem TypeError ab (24.11.2026).
+  if (!document.fullscreenElement && !matchMedia('(display-mode: fullscreen)').matches) document.documentElement.requestFullscreen?.()?.catch(() => {});
   S.p = await loadProfile(cfg);
   S.sessionId = `${id}-${new Date().toISOString()}`;
   S.mark = Date.now();
